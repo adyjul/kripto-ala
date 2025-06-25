@@ -1,7 +1,9 @@
-ccxt
 pandas
 ta
 scikit-learn
 keras
 tensorflow
 python-binance
+ccxt
+python-dotenv
+pyyaml
