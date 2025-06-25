@@ -7,3 +7,4 @@ python-binance
 ccxt
 python-dotenv
 pyyaml
+numpy
