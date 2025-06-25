@@ -5,4 +5,4 @@ leverage: 20
 margin_pct: 0.03
 sl_pct: 0.01
 tp_pct: 0.02
-threshold: 0.6
+threshold: 0.0015
