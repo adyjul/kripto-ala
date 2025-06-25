@@ -33,6 +33,7 @@ window_size = cfg['window_size']
 data = get_historical_klines(symbol=symbol, interval=interval)
 
 print(f"Jumlah data: {len(data)}")
+print(f"Jumlah data: {symbol}, interval: {interval}")
 if len(data) == 0:
     print("❌ Data dari Binance kosong. Gagal ambil data.")
     exit(1)
