@@ -31,8 +31,13 @@ window_size = cfg['window_size']
 
 # ============== GET DATA ==============
 data = get_historical_klines(symbol=symbol, interval=interval)
+
 print(f"Jumlah data: {len(data)}")
-print(f"Contoh isi data[0]: {data[0] if data else 'EMPTY'}")
+if len(data) == 0:
+    print("❌ Data dari Binance kosong. Gagal ambil data.")
+    exit(1)
+else:
+    print(f"Contoh isi data[0]: {data[0]}")
 
 close_prices = np.array([float(c[4]) for c in data]).reshape(-1, 1)
 
