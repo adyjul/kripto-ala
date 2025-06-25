@@ -1,13 +1,20 @@
 from dotenv import load_dotenv
 from binance.client import Client
+from utils.config import load_config
+cfg = load_config()
 import os
 
 load_dotenv()
 
 client = Client(api_key=os.getenv("BINANCE_API_KEY"), api_secret=os.getenv("BINANCE_SECRET"))
 
-def execute_order(symbol, signal, leverage=20, margin_pct=0.03, sl_pct=0.01, tp_pct=0.02):
+def execute_order(symbol, signal):
     try:
+        leverage = cfg['leverage']
+        margin_pct = cfg['margin_pct']
+        sl_pct = cfg['sl_pct']
+        tp_pct = cfg['tp_pct']
+
         # Set leverage
         client.futures_change_leverage(symbol=symbol, leverage=leverage)
 

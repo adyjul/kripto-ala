@@ -1,0 +1,8 @@
+symbol: BTCUSDT
+interval: 1h
+window_size: 60
+leverage: 20
+margin_pct: 0.03  # 3% dari balance
+sl_pct: 0.01       # Stop loss 1%
+tp_pct: 0.02       # Take profit 2%
+threshold: 0.6     # Probabilitas minimal untuk entry
