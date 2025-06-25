@@ -1,6 +1,7 @@
 # train_model.py
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
