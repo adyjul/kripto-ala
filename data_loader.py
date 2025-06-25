@@ -1,25 +1,28 @@
-import pandas as pd
+# data_loader.py
+
 from binance.client import Client
+from dotenv import load_dotenv
+import pandas as pd
 import os
-from utils.config import load_config
 
-cfg = load_config()
-interval = cfg['interval']
+load_dotenv()
 
-client = Client(api_key=os.getenv("BINANCE_API_KEY"), api_secret=os.getenv("BINANCE_SECRET"))
+client = Client(
+    api_key=os.getenv("BINANCE_API_KEY"),
+    api_secret=os.getenv("BINANCE_SECRET")
+)
 
-def get_historical_klines(symbol='BTCUSDT',interval=interval, lookback='1000'):
-    klines = client.get_historical_klines(symbol, interval, f"{lookback} hours ago UTC")
-    df = pd.DataFrame(klines, columns=[
-        'timestamp', 'open', 'high', 'low', 'close', 'volume',
-        'close_time', 'quote_asset_volume', 'number_of_trades',
-        'taker_buy_base', 'taker_buy_quote', 'ignore'
-    ])
-    df['close'] = pd.to_numeric(df['close'])
-    df['open'] = pd.to_numeric(df['open'])
-    df['high'] = pd.to_numeric(df['high'])
-    df['low'] = pd.to_numeric(df['low'])
-    df['volume'] = pd.to_numeric(df['volume'])
-    df['return'] = df['close'].pct_change()
-    df.dropna(inplace=True)
-    return df
+def get_historical_klines(symbol='BTCUSDT', interval='1h', lookback='1000'):
+    try:
+        raw = client.futures_klines(symbol=symbol, interval=interval, limit=int(lookback))
+        df = pd.DataFrame(raw, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'close_time', 'quote_asset_volume', 'num_trades',
+            'taker_buy_base_volume', 'taker_buy_quote_volume', 'ignore'
+        ])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
+        return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+    except Exception as e:
+        print(f"❌ Gagal ambil data dari Binance: {e}")
+        return pd.DataFrame()

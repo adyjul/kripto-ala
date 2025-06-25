@@ -1,73 +1,64 @@
-import os
-# ============== FORCE CPU ONLY ==============
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # suppress TensorFlow warnings
+# train_model_cpu.py
 
-# ============== SET SEED FOR REPRODUCIBILITY ==============
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import tensorflow as tf
 import numpy as np
 import random
+import pandas as pd
 
-SEED = 42
-os.environ['PYTHONHASHSEED'] = str(SEED)
-tf.random.set_seed(SEED)
-np.random.seed(SEED)
-random.seed(SEED)
+# Set seed untuk hasil konsisten
+seed = 42
+os.environ['PYTHONHASHSEED'] = str(seed)
+tf.random.set_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
 
-# ============== IMPORT LIBRARIES ==============
-from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
+from sklearn.preprocessing import MinMaxScaler
+
 from data_loader import get_historical_klines
 from utils.config import load_config
-import os
 
-# ============== LOAD CONFIG ==============
+# Load config
 cfg = load_config()
 symbol = cfg['symbol']
 interval = cfg['interval']
 window_size = cfg['window_size']
 
-
-# ============== GET DATA ==============
+# Load data
 data = get_historical_klines(symbol=symbol, interval=interval)
 
-print(f"Jumlah data: {len(data)}")
-print(f"Jumlah data: {symbol}, interval: {interval}")
-if len(data) == 0:
-    print("❌ Data dari Binance kosong. Gagal ambil data.")
-    exit(1)
-else:
-    print(f"Contoh isi data[0]: {data[0]}")
+# Validasi
+if data.empty:
+    raise ValueError("❌ Data dari Binance kosong. Pastikan API dan koneksi OK.")
 
-close_prices = np.array([float(c[4]) for c in data]).reshape(-1, 1)
-
-# ============== PREPROCESS ==============
+# Preprocessing
 scaler = MinMaxScaler()
-scaled_data = scaler.fit_transform(close_prices)
+scaled_close = scaler.fit_transform(data['close'].values.reshape(-1, 1))
 
-X = []
-y = []
+X, y = [], []
 
-for i in range(window_size, len(scaled_data)):
-    X.append(scaled_data[i-window_size:i, 0])
-    y.append(scaled_data[i, 0])
+for i in range(window_size, len(scaled_close)):
+    X.append(scaled_close[i - window_size:i, 0])
+    y.append(scaled_close[i, 0])
 
 X, y = np.array(X), np.array(y)
 X = np.reshape(X, (X.shape[0], X.shape[1], 1))
 
-# ============== BUILD MODEL ==============
+# Build model
 model = Sequential()
-model.add(LSTM(units=50, return_sequences=True, input_shape=(X.shape[1], 1)))
-model.add(LSTM(units=50))
+model.add(LSTM(50, return_sequences=True, input_shape=(X.shape[1], 1)))
+model.add(LSTM(50))
 model.add(Dense(1))
 
 model.compile(optimizer='adam', loss='mean_squared_error')
-
-# ============== TRAIN ==============
 model.fit(X, y, epochs=10, batch_size=32)
 
-# ============== SAVE MODEL ==============
+# Save model
 os.makedirs("models", exist_ok=True)
 model.save("models/crypto_model.h5")
-print("✅ Model trained and saved to models/crypto_model.h5")
+print("✅ Model selesai dilatih dan disimpan ke models/crypto_model.h5")
