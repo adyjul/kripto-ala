@@ -1,15 +1,6 @@
-# config.yaml
-
 symbol: BTCUSDT
-interval: 5m
-window_size: 50
-
-# Lebih tajam, cocok untuk scalping real-time
-threshold: 0.0005      # 0.05%
-tp_pct: 0.002          # 0.2% Take Profit
-sl_pct: 0.001          # 0.1% Stop Loss
-
-margin_pct: 0.025      # 2.5% margin
-leverage: 20
-
-log_path: logs/
+interval: 15m
+tp_pct: 0.002
+sl_pct: 0.0015
+window: 3
+model_path: model_scalping_15m.pkl
