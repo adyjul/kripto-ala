@@ -1,34 +1,63 @@
-# analyze_validation.py
-
 import pandas as pd
+from data import fetch_data
+from datetime import datetime
 
-log_file = 'logs/validation_log.csv'
+FILENAME = 'validasi_scalping_15m.xlsx'
+LOOKAHEAD = 3  # Cek max 3 candle (15 menit x 3 = 45 menit)
 
-try:
-    df = pd.read_csv(log_file)
-except FileNotFoundError:
-    print("❌ File log belum ditemukan.")
-    exit()
+def check_hits():
+    df_signals = pd.read_excel(FILENAME)
 
-if df.empty:
-    print("❌ Log masih kosong.")
-    exit()
+    # Ambil candle terbaru
+    df_candle = fetch_data(limit=LOOKAHEAD + 1)  # +1 karena candle saat ini
+    highs = df_candle['high'].iloc[-LOOKAHEAD:]
+    lows = df_candle['low'].iloc[-LOOKAHEAD:]
 
-total = len(df)
-tp = df['tp_hit'].sum()
-sl = df['sl_hit'].sum()
-hold = df[df['decision'] == 'HOLD'].shape[0]
-no_hit = df[(df['result'] == 'NO-HIT')].shape[0]
+    updated = False
 
-winrate = (tp / (tp + sl)) * 100 if (tp + sl) > 0 else 0
-rrr = (df['tp_hit'].sum() * 0.002) / (df['sl_hit'].sum() * 0.001) if df['sl_hit'].sum() > 0 else "∞"
+    for i in range(len(df_signals)):
+        row = df_signals.loc[i]
+        if row['status'] != 'HOLD':
+            continue  # skip yg sudah TP/SL
 
-print(f"🔍 Evaluasi Hasil Validasi:")
-print(f"Total Data       : {total}")
-print(f"Total LONG/SHORT : {total - hold}")
-print(f"TP Hit           : {tp}")
-print(f"SL Hit           : {sl}")
-print(f"NO-HIT           : {no_hit}")
-print(f"HOLD             : {hold}")
-print(f"✅ Winrate        : {winrate:.2f}%")
-print(f"📈 Estimasi RRR   : {rrr}")
+        tp, sl = row['tp_price'], row['sl_price']
+        signal = row['signal']
+
+        hit_tp = False
+        hit_sl = False
+
+        # Cek kondisi
+        for h, l in zip(highs, lows):
+            if signal == 'LONG':
+                if h >= tp:
+                    hit_tp = True
+                    break
+                elif l <= sl:
+                    hit_sl = True
+                    break
+            elif signal == 'SHORT':
+                if l <= tp:
+                    hit_tp = True
+                    break
+                elif h >= sl:
+                    hit_sl = True
+                    break
+
+        if hit_tp:
+            df_signals.at[i, 'status'] = 'TP'
+            updated = True
+        elif hit_sl:
+            df_signals.at[i, 'status'] = 'SL'
+            updated = True
+        else:
+            df_signals.at[i, 'status'] = 'NO-HIT'
+            updated = True
+
+    if updated:
+        df_signals.to_excel(FILENAME, index=False)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Status updated.")
+    else:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ No updates.")
+
+if __name__ == "__main__":
+    check_hits()

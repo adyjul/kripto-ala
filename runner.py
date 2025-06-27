@@ -1,14 +1,25 @@
 import time
-from datetime import datetime
 import pandas as pd
+from datetime import datetime
 from model import predict_live
-from data_loader import fetch_data
-from analisa_trade import check_hits
+from data import fetch_data
 
 FILENAME = 'validasi_scalping_15m.xlsx'
 
-TP_PCT = 0.002   # 0.2% TP
-SL_PCT = 0.0015  # 0.15% SL
+TP_PCT = 0.002   # Target Profit: 0.2%
+SL_PCT = 0.0015  # Stop Loss: 0.15%
+
+def init_excel():
+    try:
+        df = pd.read_excel(FILENAME)
+    except FileNotFoundError:
+        df = pd.DataFrame(columns=[
+            'timestamp', 'signal', 'probability',
+            'entry_price', 'tp_price', 'sl_price',
+            'status'
+        ])
+        df.to_excel(FILENAME, index=False)
+    return df
 
 def append_signal(signal, prob, entry_price):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -29,39 +40,33 @@ def append_signal(signal, prob, entry_price):
         'status': 'HOLD'
     }
 
-    try:
-        df = pd.read_excel(FILENAME)
-    except FileNotFoundError:
-        df = pd.DataFrame(columns=new_row.keys())
-
+    df = pd.read_excel(FILENAME)
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(FILENAME, index=False)
 
-def main_loop():
-    print("🚀 Bot scalping 15M running...")
-
+def run():
+    print("🔁 Validasi sinyal LONG/SHORT berjalan terus...")
+    init_excel()
     while True:
         try:
-            # ✅ Step 1: Prediksi sinyal
+            # Ambil sinyal
             pred, prob = predict_live()
             signal = 'LONG' if pred == 1 else 'SHORT'
 
-            # ✅ Step 2: Ambil harga entry dari candle terbaru
+            # Ambil harga terkini dari candle terakhir
             df_candle = fetch_data(limit=2)
             entry_price = df_candle['close'].iloc[-1]
 
-            # ✅ Step 3: Simpan ke file validasi
+            # Simpan hasil
             append_signal(signal, prob, entry_price)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Signal: {signal} | Prob: {prob:.2f} | Entry: {entry_price:.2f}")
 
-            # ✅ Step 4: Evaluasi sinyal sebelumnya
-            check_hits()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Sinyal: {signal} | Prob: {prob:.2f} | Entry: {entry_price:.2f}")
 
         except Exception as e:
-            print(f"❌ Error in main loop: {e}")
+            print(f"❌ Error: {e}")
 
-        # ⏳ Tunggu 15 menit sebelum iterasi berikutnya
+        # Tunggu 15 menit (900 detik)
         time.sleep(900)
 
 if __name__ == "__main__":
-    main_loop()
+    run()
