@@ -12,7 +12,7 @@ client = Client(
     api_secret=os.getenv("BINANCE_SECRET")
 )
 
-def get_historical_klines(symbol='BTCUSDT', interval='1h', lookback='1000'):
+def get_historical_klines(symbol='BTCUSDT', interval='5m', lookback='1000'):
     try:
         raw = client.futures_klines(symbol=symbol, interval=interval, limit=int(lookback))
         df = pd.DataFrame(raw, columns=[
@@ -20,9 +20,12 @@ def get_historical_klines(symbol='BTCUSDT', interval='1h', lookback='1000'):
             'close_time', 'quote_asset_volume', 'num_trades',
             'taker_buy_base_volume', 'taker_buy_quote_volume', 'ignore'
         ])
+        
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
+
         return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+    
     except Exception as e:
-        print(f"❌ Gagal ambil data dari Binance: {e}")
+        print(f"❌ Gagal ambil data Binance: {e}")
         return pd.DataFrame()
