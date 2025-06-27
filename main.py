@@ -1,62 +1,79 @@
-import time
-from datetime import datetime
 import pandas as pd
-from model import predict_live
-from data_loader import fetch_data
-from analisa_trade import check_hits
+import numpy as np
+from datetime import datetime
+from ta.momentum import RSIIndicator
+from ta.trend import MACD, EMAIndicator, ADXIndicator
+from ta.volatility import AverageTrueRange
+import joblib
+import warnings
+warnings.filterwarnings('ignore')
 
-FILENAME = 'validasi_scalping_15m.csv'
+MODEL_PATH = 'model_scalping_15m.pkl'
+OUTPUT_FILE = 'validasi_scalping_15m.xlsx'
 
-TP_PCT = 0.002
-SL_PCT = 0.0015
+model = joblib.load(MODEL_PATH)
 
-def append_signal(signal, prob, entry_price):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    if signal == 'LONG':
-        tp = entry_price * (1 + TP_PCT)
-        sl = entry_price * (1 - SL_PCT)
-    else:
-        tp = entry_price * (1 - TP_PCT)
-        sl = entry_price * (1 + SL_PCT)
+def load_latest_candle():
+    # Ganti ini sesuai sumber datamu
+    df = pd.read_excel('data/scalping_15m.xlsx')
+    df = df.sort_values('timestamp')
+
+    # Hitung indikator (harus urut sesuai train.py)
+    df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
+    macd = MACD(close=df['close'])
+    df['macd'] = macd.macd()
+    df['macd_signal'] = macd.macd_signal()
+    df['macd_hist'] = macd.macd_diff()
+    df['ema_fast'] = EMAIndicator(close=df['close'], window=12).ema_indicator()
+    df['ema_slow'] = EMAIndicator(close=df['close'], window=26).ema_indicator()
+    df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close'], window=14).adx()
+    df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=14).average_true_range()
+
+    df.dropna(inplace=True)
+
+    # Ambil bar terakhir untuk prediksi
+    return df.iloc[-1:]
+
+def predict_signal(df):
+    fitur = ['rsi', 'macd', 'macd_signal', 'macd_hist',
+             'ema_fast', 'ema_slow', 'adx', 'atr',
+             'open', 'high', 'low', 'close', 'volume']
+
+    X = df[fitur]
+    pred = model.predict(X)[0]
+    prob = model.predict_proba(X)[0][pred]
+
+    signal = 'LONG' if pred == 1 else 'SHORT'
+    return signal, prob, df['close'].values[0]
+
+def simpan_ke_excel(signal, prob, harga):
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    tp = harga * 1.002  # contoh TP = +0.2%
+    sl = harga * 0.998  # contoh SL = -0.2%
 
     new_row = {
-        'timestamp': timestamp,
+        'timestamp': now,
         'signal': signal,
-        'probability': prob,
-        'entry_price': entry_price,
+        'probability': round(prob, 4),
+        'entry_price': harga,
         'tp_price': tp,
         'sl_price': sl,
         'status': 'HOLD'
     }
 
     try:
-        df = pd.read_csv(FILENAME)
-        df = df.dropna(how='all')
-    except FileNotFoundError:
-        df = pd.DataFrame(columns=new_row.keys())
+        df_old = pd.read_excel(OUTPUT_FILE)
+        df_new = pd.concat([df_old, pd.DataFrame([new_row])], ignore_index=True)
+    except:
+        df_new = pd.DataFrame([new_row])
 
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(FILENAME, index=False)
-
-def main_loop():
-    print("🚀 Bot scalping 15M running...")
-
-    while True:
-        try:
-            pred, prob = predict_live()
-            signal = 'LONG' if pred == 1 else 'SHORT'
-
-            df_candle = fetch_data(limit=2)
-            entry_price = df_candle['close'].iloc[-1]
-
-            append_signal(signal, prob, entry_price)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Signal: {signal} | Prob: {prob:.2f} | Entry: {entry_price:.2f}")
-
-            check_hits()
-        except Exception as e:
-            print(f"❌ Error in main loop: {e}")
-
-        time.sleep(900)
+    df_new.to_excel(OUTPUT_FILE, index=False)
+    print(f"[{now}] ✅ Sinyal {signal} (Prob: {prob:.2f}) disimpan ke Excel.")
 
 if __name__ == "__main__":
-    main_loop()
+    try:
+        latest = load_latest_candle()
+        signal, prob, harga = predict_signal(latest)
+        simpan_ke_excel(signal, prob, harga)
+    except Exception as e:
+        print(f"❌ Error in main loop: {e}")
