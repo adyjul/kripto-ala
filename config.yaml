@@ -1,8 +1,6 @@
 symbol: BTCUSDT
-interval: 1h
+interval: 5m
 window_size: 60
-leverage: 20
-margin_pct: 0.03
-sl_pct: 0.01
-tp_pct: 0.02
-threshold: 0.0015
+threshold: 0.0015   # 0.15%
+tp_pct: 0.004       # 0.4% take profit
+sl_pct: 0.0015      # 0.15% stop loss
