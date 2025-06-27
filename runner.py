@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from datetime import datetime
 from model import predict_live
-from data import fetch_data
+from data_loader import fetch_data
 
 FILENAME = 'validasi_scalping_15m.xlsx'
 
