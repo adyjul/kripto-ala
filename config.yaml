@@ -14,8 +14,11 @@ window_size: 50
 threshold: 0.0005  # 0.05%
 
 # Target Take Profit dan Stop Loss (dalam persen)
-tp_pct: 0.004      # 0.4%
-sl_pct: 0.0015     # 0.15%
+# tp_pct: 0.004      # 0.4%
+# sl_pct: 0.0015     # 0.15%
+
+tp_pct: 0.002  # 0.2%
+sl_pct: 0.001  # 0.1%
 
 # Margin & leverage (kalau diimplementasikan ke auto-entry)
 margin_pct: 0.025  # 2.5%
