@@ -1,5 +1,5 @@
 import pandas as pd
-from data import fetch_data
+from data_loader import fetch_data
 from datetime import datetime
 
 FILENAME = 'validasi_scalping_15m.xlsx'
