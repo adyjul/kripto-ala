@@ -1,6 +1,25 @@
+# config.yaml
+
+# Target pair
 symbol: BTCUSDT
+
+# Candlestick interval Binance
 interval: 5m
-window_size: 60
-threshold: 0.0015   # 0.15%
-tp_pct: 0.004       # 0.4% take profit
-sl_pct: 0.0015      # 0.15% stop loss
+
+# Ukuran jendela data historis yang dipakai untuk prediksi
+window_size: 50
+
+# Threshold keputusan (persentase perubahan prediksi vs harga saat ini)
+# Lebih kecil → lebih agresif memberi sinyal
+threshold: 0.0005  # 0.05%
+
+# Target Take Profit dan Stop Loss (dalam persen)
+tp_pct: 0.004      # 0.4%
+sl_pct: 0.0015     # 0.15%
+
+# Margin & leverage (kalau diimplementasikan ke auto-entry)
+margin_pct: 0.025  # 2.5%
+leverage: 20
+
+# Simulasi log folder
+log_path: logs/

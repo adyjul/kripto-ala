@@ -14,14 +14,6 @@ from utils.config import load_config
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-cfg = load_config()
-symbol = cfg['symbol']
-interval = cfg.get('interval', '5m')
-window_size = cfg['window_size']
-tp_pct = cfg.get('tp_pct', 0.004)
-sl_pct = cfg.get('sl_pct', 0.0015)
-threshold = cfg.get('threshold', 0.0015)
-
 model = load_model("models/scalping_model.h5")
 
 os.makedirs("logs", exist_ok=True)
@@ -47,6 +39,15 @@ def calculate_indicators(df):
     return df.dropna()
 
 def run_validation():
+    cfg = load_config()
+    symbol = cfg['symbol']
+    interval = cfg.get('interval', '5m')
+    window_size = cfg['window_size']
+    tp_pct = cfg.get('tp_pct', 0.004)
+    sl_pct = cfg.get('sl_pct', 0.0015)
+    threshold = cfg.get('threshold', 0.0015)
+
+
     df = get_historical_klines(symbol, interval, str(window_size + 50))
     df = calculate_indicators(df)
     if len(df) <= window_size:
