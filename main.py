@@ -31,10 +31,14 @@ def append_signal(signal, prob, entry_price):
 
     try:
         df = pd.read_excel(FILENAME)
+        df = df.dropna(how='all')  # 🛠 Fix: drop empty rows
     except FileNotFoundError:
         df = pd.DataFrame(columns=new_row.keys())
 
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    # 🛠 Fix: Avoid concat warning
+    new_df = pd.DataFrame([new_row])
+    df = pd.concat([df, new_df], ignore_index=True)
+
     df.to_excel(FILENAME, index=False)
 
 def main_loop():
