@@ -14,7 +14,6 @@ from utils.config import load_config
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-# Load config
 cfg = load_config()
 symbol = cfg['symbol']
 interval = cfg.get('interval', '5m')
@@ -23,10 +22,8 @@ tp_pct = cfg.get('tp_pct', 0.004)
 sl_pct = cfg.get('sl_pct', 0.0015)
 threshold = cfg.get('threshold', 0.0015)
 
-# Load model
 model = load_model("models/scalping_model.h5")
 
-# Prepare log
 os.makedirs("logs", exist_ok=True)
 log_path = os.path.join("logs", "validation_log.csv")
 if os.path.exists(log_path):
@@ -74,10 +71,13 @@ def run_validation():
         decision = "HOLD"
 
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Prediksi: {decision}, tunggu validasi 5 menit...")
-    time.sleep(300)  # 5 menit
+    time.sleep(300)
 
     df2 = get_historical_klines(symbol, interval, "2")
-    actual_price = df2['close'].iloc[-1]
+    candle = df2.iloc[-1]
+    high = candle['high']
+    low = candle['low']
+    actual_price = candle['close']
 
     result = "-"
     tp_hit = False
@@ -85,18 +85,18 @@ def run_validation():
     if decision == "LONG":
         tp = current_price * (1 + tp_pct)
         sl = current_price * (1 - sl_pct)
-        if actual_price >= tp:
+        if high >= tp:
             result, tp_hit = "TP", True
-        elif actual_price <= sl:
+        elif low <= sl:
             result, sl_hit = "SL", True
         else:
             result = "NO-HIT"
     elif decision == "SHORT":
         tp = current_price * (1 - tp_pct)
         sl = current_price * (1 + sl_pct)
-        if actual_price <= tp:
+        if low <= tp:
             result, tp_hit = "TP", True
-        elif actual_price >= sl:
+        elif high >= sl:
             result, sl_hit = "SL", True
         else:
             result = "NO-HIT"
@@ -115,12 +115,12 @@ def run_validation():
     }
     log_df.to_csv(log_path, index=False)
 
-    print(f"[VALIDASI] Prediksi: {predicted_price:.2f}, Aktual: {actual_price:.2f}, Result: {result}")
+    print(f"[VALIDASI] {decision} | Prediksi: {predicted_price:.2f} | Actual: {actual_price:.2f} | Result: {result}")
 
 if __name__ == "__main__":
     try:
         while True:
             run_validation()
-            time.sleep(10)  # jeda sebelum iterasi baru
+            time.sleep(10)
     except KeyboardInterrupt:
         print("\n⛔ Dihentikan manual oleh user.")
