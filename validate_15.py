@@ -5,6 +5,7 @@ from datetime import datetime
 from data_loader import fetch_data
 import os
 from telegram import Bot
+import asyncio
 from dotenv import load_dotenv
 
 # Load .env
@@ -17,9 +18,9 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def kirim_pesan(message):
+async def kirim_pesan(message):
     try:
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+       await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except Exception as e:
         print(f"❌ Gagal kirim ke Telegram: {e}")
 
@@ -79,8 +80,8 @@ def validate_signals():
         f"📉 SL Price    : {row['sl_price']:.2f}\n"
         f"✅ Status      : {df.at[idx, 'status']}"
     )
+    asyncio.run(kirim_pesan(bot, TELEGRAM_CHAT_ID, pesan))
 
-    kirim_pesan(pesan)
 
 if __name__ == "__main__":
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚦 Memulai validasi status sinyal...")
