@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # Load .env
 load_dotenv()
 
-FILENAME = 'root/kritpo-ala/validasi_scalping_15m.xlsx'
+FILENAME = '/root/kritpo-ala/validasi_scalping_15m.xlsx'
 
 # Telegram Bot setup
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
