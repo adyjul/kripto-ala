@@ -1,11 +1,10 @@
-# runner.py
-import time
+# runner.py (versi cronjob)
 import pandas as pd
 from datetime import datetime
 from model import load_model, predict_live
 from data_loader import fetch_data
 
-FILENAME = 'validasi_scalping_15m.xlsx'
+FILENAME = '/root/kripto-ala/validasi_scalping_15m.xlsx'
 TP_PCT = 0.002   # Target Profit: 0.2%
 SL_PCT = 0.0015  # Stop Loss: 0.15%
 THRESHOLD = 0.55
@@ -13,9 +12,7 @@ THRESHOLD = 0.55
 model = load_model()
 
 def init_excel():
-    try:
-        pd.read_excel(FILENAME)
-    except FileNotFoundError:
+    if not pd.io.common.file_exists(FILENAME):
         df = pd.DataFrame(columns=[
             'timestamp', 'signal', 'probability',
             'current_price', 'predicted_entry_price',
@@ -56,17 +53,12 @@ def append_signal(prediction):
 
     print(f"[{timestamp}] ✅ Sinyal: {signal} | Prob: {prob:.2f} | Harga: {current:.2f}")
 
-def run():
-    print("🚀 Scalping bot 15M aktif... validasi sinyal setiap 15 menit.")
+def run_once():
+    print("🚀 Scalping bot 15M (cron mode) berjalan...")
     init_excel()
-    while True:
-        try:
-            df = fetch_data(limit=100)
-            prediction = predict_live(df, model, threshold=THRESHOLD)
-            append_signal(prediction)
-        except Exception as e:
-            print(f"❌ Error: {e}")
-        time.sleep(900)  # 15 menit
+    df = fetch_data(limit=100)
+    prediction = predict_live(df, model, threshold=THRESHOLD)
+    append_signal(prediction)
 
 if __name__ == '__main__':
-    run()
+    run_once()
