@@ -3,8 +3,25 @@
 import pandas as pd
 from datetime import datetime
 from data_loader import fetch_data
+import os
+from telegram import Bot
+from dotenv import load_dotenv
+
+# Load .env
+load_dotenv()
 
 FILENAME = 'validasi_scalping_15m.xlsx'
+
+# Telegram Bot setup
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+bot = Bot(token=TELEGRAM_TOKEN)
+
+def kirim_pesan(message):
+    try:
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+    except Exception as e:
+        print(f"❌ Gagal kirim ke Telegram: {e}")
 
 def validate_signals():
     try:
@@ -53,6 +70,21 @@ def validate_signals():
     df.to_excel(FILENAME, index=False)
     print(f"✅ Validasi selesai. {updated} sinyal diperbarui.")
 
+    pesan = (
+        f"📈 Validasi Sinyal\n"
+        f"🕒 Waktu       : {row['timestamp']}\n"
+        f"📌 Sinyal      : {row['signal']}\n"
+        f"🎯 Entry       : {row['entry_price']:.2f}\n"
+        f"📈 TP Price    : {row['tp_price']:.2f}\n"
+        f"📉 SL Price    : {row['sl_price']:.2f}\n"
+        f"✅ Status      : {df.at[idx, 'status']}"
+    )
+
+    kirim_pesan(pesan)
+
 if __name__ == "__main__":
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚦 Memulai validasi status sinyal...")
     validate_signals()
+
+
+
