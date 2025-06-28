@@ -1,13 +1,47 @@
-from data_loader import fetch_data
-from features import generate_features
-from utils import load_model
+# model.py
+import joblib
+import pandas as pd
+import numpy as np
+from datetime import datetime
+from ta.momentum import RSIIndicator
+from ta.trend import EMAIndicator, MACD, ADXIndicator
+from ta.volatility import AverageTrueRange
 
-def predict_live():
-    df = fetch_data()
-    df = generate_features(df)
-    model = load_model()
-    X = df[['rsi', 'ema_fast', 'ema_slow', 'macd', 'macd_signal', 'atr', 'bb_b']]
-    X_latest = X.iloc[-1:]
-    pred = model.predict(X_latest)[0]
-    prob = model.predict_proba(X_latest)[0][1]
-    return pred, prob
+def load_model(path='models/model_scalping_15m.pkl'):
+    return joblib.load(path)
+
+def calculate_indicators(df):
+    df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
+    df['ema_fast'] = EMAIndicator(close=df['close'], window=12).ema_indicator()
+    df['ema_slow'] = EMAIndicator(close=df['close'], window=26).ema_indicator()
+    macd = MACD(close=df['close'])
+    df['macd'] = macd.macd()
+    df['macd_signal'] = macd.macd_signal()
+    df['macd_hist'] = macd.macd_diff()
+    df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close']).adx()
+    df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close']).average_true_range()
+    return df.dropna()
+
+def predict_live(df, model, threshold=0.55):
+    df = calculate_indicators(df)
+    latest = df.iloc[-1:]
+    fitur = ['rsi', 'macd', 'macd_signal', 'macd_hist',
+             'ema_fast', 'ema_slow', 'adx', 'atr',
+             'open', 'high', 'low', 'close', 'volume']
+
+    X = latest[fitur]
+    pred = model.predict(X)[0]
+    prob = model.predict_proba(X)[0][pred]
+    signal = 'LONG' if pred == 1 else 'SHORT'
+
+    if prob < threshold:
+        signal = 'HOLD'
+
+    return {
+        'signal': signal,
+        'probability': float(prob),
+        'current_price': float(latest['close'].values[0]),
+        'predicted_entry_price': float(model.predict_proba(X)[0][1] * latest['close'].values[0]) if pred == 1 else float(model.predict_proba(X)[0][0] * latest['close'].values[0]),
+        'indicators': latest[fitur].to_dict(orient='records')[0],
+        'timestamp': latest.index[-1].strftime('%Y-%m-%d %H:%M:%S') if latest.index.name == 'timestamp' else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }

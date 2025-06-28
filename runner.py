@@ -1,40 +1,50 @@
+# runner.py
 import time
 import pandas as pd
 from datetime import datetime
-from model import predict_live
+from model import load_model, predict_live
 from data_loader import fetch_data
 
 FILENAME = 'validasi_scalping_15m.xlsx'
-
 TP_PCT = 0.002   # Target Profit: 0.2%
 SL_PCT = 0.0015  # Stop Loss: 0.15%
+THRESHOLD = 0.55
+
+model = load_model()
 
 def init_excel():
     try:
-        df = pd.read_excel(FILENAME)
+        pd.read_excel(FILENAME)
     except FileNotFoundError:
         df = pd.DataFrame(columns=[
             'timestamp', 'signal', 'probability',
-            'entry_price', 'tp_price', 'sl_price',
-            'status'
+            'current_price', 'predicted_entry_price',
+            'tp_price', 'sl_price', 'status'
         ])
         df.to_excel(FILENAME, index=False)
-    return df
 
-def append_signal(signal, prob, entry_price):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def append_signal(prediction):
+    signal = prediction['signal']
+    prob = prediction['probability']
+    current = prediction['current_price']
+    predicted_entry = prediction['predicted_entry_price']
+    timestamp = prediction['timestamp']
+
     if signal == 'LONG':
-        tp = entry_price * (1 + TP_PCT)
-        sl = entry_price * (1 - SL_PCT)
-    else:  # SHORT
-        tp = entry_price * (1 - TP_PCT)
-        sl = entry_price * (1 + SL_PCT)
+        tp = current * (1 + TP_PCT)
+        sl = current * (1 - SL_PCT)
+    elif signal == 'SHORT':
+        tp = current * (1 - TP_PCT)
+        sl = current * (1 + SL_PCT)
+    else:
+        tp = sl = current
 
     new_row = {
         'timestamp': timestamp,
         'signal': signal,
         'probability': prob,
-        'entry_price': entry_price,
+        'current_price': current,
+        'predicted_entry_price': predicted_entry,
         'tp_price': tp,
         'sl_price': sl,
         'status': 'HOLD'
@@ -44,29 +54,19 @@ def append_signal(signal, prob, entry_price):
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(FILENAME, index=False)
 
+    print(f"[{timestamp}] ✅ Sinyal: {signal} | Prob: {prob:.2f} | Harga: {current:.2f}")
+
 def run():
-    print("🔁 Validasi sinyal LONG/SHORT berjalan terus...")
+    print("🚀 Scalping bot 15M aktif... validasi sinyal setiap 15 menit.")
     init_excel()
     while True:
         try:
-            # Ambil sinyal
-            pred, prob = predict_live()
-            signal = 'LONG' if pred == 1 else 'SHORT'
-
-            # Ambil harga terkini dari candle terakhir
-            df_candle = fetch_data(limit=2)
-            entry_price = df_candle['close'].iloc[-1]
-
-            # Simpan hasil
-            append_signal(signal, prob, entry_price)
-
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Sinyal: {signal} | Prob: {prob:.2f} | Entry: {entry_price:.2f}")
-
+            df = fetch_data(limit=100)
+            prediction = predict_live(df, model, threshold=THRESHOLD)
+            append_signal(prediction)
         except Exception as e:
             print(f"❌ Error: {e}")
+        time.sleep(900)  # 15 menit
 
-        # Tunggu 15 menit (900 detik)
-        time.sleep(900)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     run()
