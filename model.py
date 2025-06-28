@@ -8,7 +8,7 @@ from ta.volatility import AverageTrueRange
 
 THRESHOLD = 0.5  # Turunkan threshold agar lebih agresif
 
-def load_model(path='model_scalping_15m.pkl'):
+def load_model(path='root/kripto-ala/model_scalping_15m.pkl'):
     return joblib.load(path)
 
 def calculate_indicators(df):
