@@ -74,7 +74,7 @@ def validate_signals():
         f"📈 Validasi Sinyal\n"
         f"🕒 Waktu       : {row['timestamp']}\n"
         f"📌 Sinyal      : {row['signal']}\n"
-        f"🎯 Entry       : {row['entry_price']:.2f}\n"
+        f"🎯 Entry       : {row['current_price']:.2f}\n"
         f"📈 TP Price    : {row['tp_price']:.2f}\n"
         f"📉 SL Price    : {row['sl_price']:.2f}\n"
         f"✅ Status      : {df.at[idx, 'status']}"
