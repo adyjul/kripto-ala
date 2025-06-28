@@ -8,7 +8,7 @@ from ta.trend import EMAIndicator, MACD, ADXIndicator
 from ta.volatility import AverageTrueRange
 
 
-def load_model(path='models/model_scalping_15m.pkl'):
+def load_model(path='model_scalping_15m.pkl'):
     return joblib.load(path)
 
 
