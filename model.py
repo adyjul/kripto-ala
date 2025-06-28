@@ -1,4 +1,3 @@
-# model.py
 import joblib
 import pandas as pd
 import numpy as np
@@ -7,10 +6,10 @@ from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator, MACD, ADXIndicator
 from ta.volatility import AverageTrueRange
 
+THRESHOLD = 0.5  # Turunkan threshold agar lebih agresif
 
 def load_model(path='model_scalping_15m.pkl'):
     return joblib.load(path)
-
 
 def calculate_indicators(df):
     df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
@@ -24,8 +23,7 @@ def calculate_indicators(df):
     df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close']).average_true_range()
     return df.dropna()
 
-
-def predict_live(df, model, threshold=0.55):
+def predict_live(df, model, threshold=THRESHOLD):
     df = calculate_indicators(df)
     latest = df.iloc[-1:]
     fitur = ['rsi', 'macd', 'macd_signal', 'macd_hist',
@@ -40,11 +38,20 @@ def predict_live(df, model, threshold=0.55):
     if prob < threshold:
         signal = 'HOLD'
 
+    close_price = float(latest['close'].values[0])
+    atr_value = float(latest['atr'].values[0])
+
+    # Gunakan ATR sebagai dasar prediksi harga target
+    predicted_entry_price = close_price
+
     return {
         'signal': signal,
         'probability': float(prob),
-        'current_price': float(latest['close'].values[0]),
-        'predicted_entry_price': float(model.predict_proba(X)[0][1] * latest['close'].values[0]) if pred == 1 else float(model.predict_proba(X)[0][0] * latest['close'].values[0]),
+        'current_price': close_price,
+        'predicted_entry_price': predicted_entry_price,
+        'atr': atr_value,
+        'high': float(latest['high'].values[0]),
+        'low': float(latest['low'].values[0]),
         'indicators': latest[fitur].to_dict(orient='records')[0],
         'timestamp': latest.index[-1].strftime('%Y-%m-%d %H:%M:%S') if latest.index.name == 'timestamp' else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
