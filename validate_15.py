@@ -80,7 +80,7 @@ def validate_signals():
         f"📉 SL Price    : {row['sl_price']:.2f}\n"
         f"✅ Status      : {df.at[idx, 'status']}"
     )
-    asyncio.run(kirim_pesan(bot, TELEGRAM_CHAT_ID, pesan))
+    asyncio.run(kirim_pesan(pesan))
 
 
 if __name__ == "__main__":
