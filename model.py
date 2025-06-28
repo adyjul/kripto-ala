@@ -7,8 +7,10 @@ from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator, MACD, ADXIndicator
 from ta.volatility import AverageTrueRange
 
+
 def load_model(path='models/model_scalping_15m.pkl'):
     return joblib.load(path)
+
 
 def calculate_indicators(df):
     df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
@@ -21,6 +23,7 @@ def calculate_indicators(df):
     df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close']).adx()
     df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close']).average_true_range()
     return df.dropna()
+
 
 def predict_live(df, model, threshold=0.55):
     df = calculate_indicators(df)
