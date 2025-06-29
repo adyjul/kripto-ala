@@ -1,15 +1,18 @@
-# runner.py (versi cronjob)
+# runner.py (versi untuk cronjob + model terbaru)
+
 import pandas as pd
 from datetime import datetime
-from model import load_model, predict_live
+from model import load_data, predict_live
 from data_loader import fetch_data
 
 FILENAME = '/root/kripto-ala/validasi_scalping_15m.xlsx'
+MODEL_PATH = '/root/kripto-ala/models/model_scalping_15m.pkl'
+
 TP_PCT = 0.002   # Target Profit: 0.2%
 SL_PCT = 0.0015  # Stop Loss: 0.15%
-THRESHOLD = 0.55
+THRESHOLD = 0.55  # Ambang probabilitas minimal agar tidak HOLD
 
-model = load_model()
+model = load_data(MODEL_PATH)
 
 def init_excel():
     if not pd.io.common.file_exists(FILENAME):
@@ -34,7 +37,7 @@ def append_signal(prediction):
         tp = current * (1 - TP_PCT)
         sl = current * (1 + SL_PCT)
     else:
-        tp = sl = current
+        tp = sl = current  # Untuk HOLD, TP dan SL sama
 
     new_row = {
         'timestamp': timestamp,
@@ -54,11 +57,15 @@ def append_signal(prediction):
     print(f"[{timestamp}] ✅ Sinyal: {signal} | Prob: {prob:.2f} | Harga: {current:.2f}")
 
 def run_once():
-    print("🚀 Scalping bot 15M (cron mode) berjalan...")
+    print("🚀 Scalping bot 15M (versi terbaru) berjalan...")
     init_excel()
-    df = fetch_data(limit=100)
-    prediction = predict_live(df, model, threshold=THRESHOLD)
-    append_signal(prediction)
+
+    try:
+        df = fetch_data(limit=100)
+        prediction = predict_live(df, model, threshold=THRESHOLD)
+        append_signal(prediction)
+    except Exception as e:
+        print(f"❌ Gagal prediksi: {e}")
 
 if __name__ == '__main__':
     run_once()
