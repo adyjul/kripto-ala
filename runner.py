@@ -66,6 +66,9 @@ def run_once():
 
     try:
         df = fetch_data(limit=100)
+        df['body'] = abs(df['close'] - df['open'])
+        df['range'] = df['high'] - df['low']
+        df['volatility_ratio'] = df['range'] / df['close']
         prediction = predict_live(df, model, threshold=THRESHOLD)
         append_signal(prediction)
     except Exception as e:
