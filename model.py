@@ -61,12 +61,13 @@ def calculate_features(df):
 
 
 def predict_live(df, model, threshold=0.55):
-    df = calculate_indicators(df)
+    df = calculate_features(df)
     latest = df.iloc[-1:]
 
     fitur = ['rsi', 'macd', 'macd_signal', 'macd_hist',
              'ema_fast', 'ema_slow', 'adx', 'atr',
-             'open', 'high', 'low', 'close', 'volume']
+             'open', 'high', 'low', 'close', 'volume',
+             'body', 'range', 'volatility_ratio']
 
     X = latest[fitur]
     pred = model.predict(X)[0]
@@ -81,7 +82,7 @@ def predict_live(df, model, threshold=0.55):
         'signal': signal,
         'probability': float(prob),
         'current_price': close_price,
-        'predicted_entry_price': close_price,  # default
+        'predicted_entry_price': close_price,
         'timestamp': latest.index[-1].strftime('%Y-%m-%d %H:%M:%S') if latest.index.name == 'timestamp' else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 

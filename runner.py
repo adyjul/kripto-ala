@@ -2,7 +2,7 @@
 
 import pandas as pd
 from datetime import datetime
-from model import load_data, predict_live
+from model import load_data, predict_live,calculate_features
 from data_loader import fetch_data
 import joblib
 
@@ -66,10 +66,10 @@ def run_once():
 
     try:
         df = fetch_data(limit=100)
-        df['body'] = abs(df['close'] - df['open'])
-        df['range'] = df['high'] - df['low']
-        df['volatility_ratio'] = df['range'] / df['close']
-        
+        # df['body'] = abs(df['close'] - df['open'])
+        # df['range'] = df['high'] - df['low']
+        # df['volatility_ratio'] = df['range'] / df['close']
+        # df = calculate_features(df)
         prediction = predict_live(df, model, threshold=THRESHOLD)
         append_signal(prediction)
     except Exception as e:
