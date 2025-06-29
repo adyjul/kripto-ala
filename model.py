@@ -39,20 +39,22 @@ def load_data():
     df.dropna(inplace=True)
     return df
 
-def calculate_indicators(df):
+def calculate_features(df):
     df = df.copy()
     df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
-    
     macd = MACD(close=df['close'])
     df['macd'] = macd.macd()
     df['macd_signal'] = macd.macd_signal()
     df['macd_hist'] = macd.macd_diff()
-    
     df['ema_fast'] = EMAIndicator(close=df['close'], window=12).ema_indicator()
     df['ema_slow'] = EMAIndicator(close=df['close'], window=26).ema_indicator()
+    df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close']).adx()
+    df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close']).average_true_range()
     
-    df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close'], window=14).adx()
-    df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=14).average_true_range()
+    # Tambahan fitur scalping
+    df['body'] = abs(df['close'] - df['open'])
+    df['range'] = df['high'] - df['low']
+    df['volatility_ratio'] = df['range'] / df['close']
     
     df.dropna(inplace=True)
     return df
