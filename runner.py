@@ -1,33 +1,31 @@
-# runner.py (versi untuk cronjob + model terbaru)
+# runner_tp_sl_dinamis.py
 
 import pandas as pd
 from datetime import datetime
-from model import load_data, predict_live,calculate_features
+from model import predict_live, calculate_features
 from data_loader import fetch_data
 import joblib
+import numpy as np
 
-FILENAME = '/root/kripto-ala/validasi_scalping_15m.xlsx'
+FILENAME = '/root/kripto-ala/validasi_scalping_15m_dinamis.xlsx'
 MODEL_PATH = '/root/kripto-ala/models/model_scalping_15m.pkl'
 
-TP_PCT = 0.002   # Target Profit: 0.2%
-SL_PCT = 0.0015  # Stop Loss: 0.15%
-THRESHOLD = 0.55  # Ambang probabilitas minimal agar tidak HOLD
+ATR_FACTOR_TP = 1.5
+ATR_FACTOR_SL = 1.0
+THRESHOLD = 0.55
 
-def load_model(path):
-    return joblib.load(path)
-
-model = load_model(MODEL_PATH)
+model = joblib.load(MODEL_PATH)
 
 def init_excel():
     if not pd.io.common.file_exists(FILENAME):
         df = pd.DataFrame(columns=[
             'timestamp', 'signal', 'probability',
             'current_price', 'predicted_entry_price',
-            'tp_price', 'sl_price', 'status'
+            'tp_price', 'sl_price', 'status', 'atr', 'volatility_ratio'
         ])
         df.to_excel(FILENAME, index=False)
 
-def append_signal(prediction):
+def append_signal(prediction, atr, vr):
     signal = prediction['signal']
     prob = prediction['probability']
     current = prediction['current_price']
@@ -35,13 +33,13 @@ def append_signal(prediction):
     timestamp = prediction['timestamp']
 
     if signal == 'LONG':
-        tp = current * (1 + TP_PCT)
-        sl = current * (1 - SL_PCT)
+        tp = current + (atr * ATR_FACTOR_TP)
+        sl = current - (atr * ATR_FACTOR_SL)
     elif signal == 'SHORT':
-        tp = current * (1 - TP_PCT)
-        sl = current * (1 + SL_PCT)
+        tp = current - (atr * ATR_FACTOR_TP)
+        sl = current + (atr * ATR_FACTOR_SL)
     else:
-        tp = sl = current  # Untuk HOLD, TP dan SL sama
+        tp = sl = current
 
     new_row = {
         'timestamp': timestamp,
@@ -51,27 +49,32 @@ def append_signal(prediction):
         'predicted_entry_price': predicted_entry,
         'tp_price': tp,
         'sl_price': sl,
-        'status': 'HOLD'
+        'status': 'HOLD',
+        'atr': atr,
+        'volatility_ratio': vr
     }
 
     df = pd.read_excel(FILENAME)
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_excel(FILENAME, index=False)
 
-    print(f"[{timestamp}] ✅ Sinyal: {signal} | Prob: {prob:.2f} | Harga: {current:.2f}")
+    print(f"[{timestamp}] ✅ Sinyal: {signal} | Prob: {prob:.2f} | Harga: {current:.2f} | ATR: {atr:.4f}")
 
 def run_once():
-    print("🚀 Scalping bot 15M (versi terbaru) berjalan...")
+    print("\n🚀 Scalping bot 15M dengan TP/SL dinamis berjalan...")
     init_excel()
-
     try:
         df = fetch_data(limit=100)
-        # df['body'] = abs(df['close'] - df['open'])
-        # df['range'] = df['high'] - df['low']
-        # df['volatility_ratio'] = df['range'] / df['close']
-        # df = calculate_features(df)
+        df = calculate_features(df)
+        latest = df.iloc[-1]
         prediction = predict_live(df, model, threshold=THRESHOLD)
-        append_signal(prediction)
+
+        append_signal(
+            prediction,
+            atr=latest['atr'],
+            vr=latest['volatility_ratio']
+        )
+
     except Exception as e:
         print(f"❌ Gagal prediksi: {e}")
 
