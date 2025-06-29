@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 from model import load_data, predict_live
 from data_loader import fetch_data
+import joblib
 
 FILENAME = '/root/kripto-ala/validasi_scalping_15m.xlsx'
 MODEL_PATH = '/root/kripto-ala/models/model_scalping_15m.pkl'
@@ -12,7 +13,10 @@ TP_PCT = 0.002   # Target Profit: 0.2%
 SL_PCT = 0.0015  # Stop Loss: 0.15%
 THRESHOLD = 0.55  # Ambang probabilitas minimal agar tidak HOLD
 
-model = load_data(MODEL_PATH)
+def load_model(path):
+    return joblib.load(path)
+
+model = load_model(MODEL_PATH)
 
 def init_excel():
     if not pd.io.common.file_exists(FILENAME):
