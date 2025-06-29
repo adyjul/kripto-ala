@@ -18,9 +18,10 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 bot = Bot(token=TELEGRAM_TOKEN)
 
-async def kirim_pesan(message):
+async def kirim_pesan_bulk(pesan_list):
     try:
-       await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        for pesan in pesan_list:
+            await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=pesan)
     except Exception as e:
         print(f"❌ Gagal kirim ke Telegram: {e}")
 
@@ -46,46 +47,44 @@ def validate_signals():
     low = latest_candle['low']
 
     updated = 0
+    pesan_list = []
+
     for idx, row in df.iterrows():
         if row['status'] != 'HOLD':
-            continue  # skip yang sudah terisi
+            continue
 
+        status = 'NO-HIT'
         if row['signal'] == 'LONG':
             if high >= row['tp_price']:
-                df.at[idx, 'status'] = 'TP'
+                status = 'TP'
             elif low <= row['sl_price']:
-                df.at[idx, 'status'] = 'SL'
-            else:
-                df.at[idx, 'status'] = 'NO-HIT'
-
+                status = 'SL'
         elif row['signal'] == 'SHORT':
             if low <= row['tp_price']:
-                df.at[idx, 'status'] = 'TP'
+                status = 'TP'
             elif high >= row['sl_price']:
-                df.at[idx, 'status'] = 'SL'
-            else:
-                df.at[idx, 'status'] = 'NO-HIT'
+                status = 'SL'
 
+        df.at[idx, 'status'] = status
         updated += 1
+
+        pesan_list.append(
+            f"📈 Validasi Sinyal\n"
+            f"🕒 Waktu       : {row['timestamp']}\n"
+            f"📌 Sinyal      : {row['signal']}\n"
+            f"🎯 Entry       : {row['current_price']:.2f}\n"
+            f"📈 TP Price    : {row['tp_price']:.2f}\n"
+            f"📉 SL Price    : {row['sl_price']:.2f}\n"
+            f"✅ Status      : {status}"
+        )
 
     df.to_excel(FILENAME, index=False)
     print(f"✅ Validasi selesai. {updated} sinyal diperbarui.")
 
-    pesan = (
-        f"📈 Validasi Sinyal\n"
-        f"🕒 Waktu       : {row['timestamp']}\n"
-        f"📌 Sinyal      : {row['signal']}\n"
-        f"🎯 Entry       : {row['current_price']:.2f}\n"
-        f"📈 TP Price    : {row['tp_price']:.2f}\n"
-        f"📉 SL Price    : {row['sl_price']:.2f}\n"
-        f"✅ Status      : {df.at[idx, 'status']}"
-    )
-    asyncio.run(kirim_pesan(pesan))
+    if pesan_list:
+        asyncio.run(kirim_pesan_bulk(pesan_list))
 
 
 if __name__ == "__main__":
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚦 Memulai validasi status sinyal...")
     validate_signals()
-
-
-
