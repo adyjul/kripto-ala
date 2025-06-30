@@ -1,110 +1,150 @@
-# validate_status.py (dengan logika dinamis dan konfirmasi indikator tambahan)
-
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 from data_loader import fetch_data
+from ta.trend import EMAIndicator, ADXIndicator
+from ta.momentum import RSIIndicator
+from ta.volatility import AverageTrueRange
 import os
 from telegram import Bot
 import asyncio
 from dotenv import load_dotenv
-from ta.momentum import RSIIndicator
-from ta.trend import MACD
-from ta.volatility import AverageTrueRange
 
-# Load .env
+# === Konfigurasi ===
 load_dotenv()
-
 FILENAME = '/root/kripto-ala/validasi_scalping_15m.xlsx'
-
-# Telegram Bot setup
+MAX_LOOKAHEAD = 3  # maksimal 3 candle ke depan (3x15m = 45 menit)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 bot = Bot(token=TELEGRAM_TOKEN)
 
+
 async def kirim_pesan(message):
     try:
-       await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except Exception as e:
         print(f"❌ Gagal kirim ke Telegram: {e}")
 
-def konfirmasi_indikator(df_candle):
-    df_candle['rsi'] = RSIIndicator(close=df_candle['close'], window=14).rsi()
-    macd = MACD(close=df_candle['close'])
-    df_candle['macd_hist'] = macd.macd_diff()
-    df_candle.dropna(inplace=True)
-    return df_candle
+
+def calculate_indicators(df):
+    df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
+    df['ema_fast'] = EMAIndicator(close=df['close'], window=12).ema_indicator()
+    df['ema_slow'] = EMAIndicator(close=df['close'], window=26).ema_indicator()
+    df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close']).adx()
+    df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close']).average_true_range()
+    df['vol_spike'] = df['volume'] > df['volume'].rolling(window=10).mean() * 1.5
+    df.dropna(inplace=True)
+    return df
+
 
 def validate_signals():
     try:
-        df = pd.read_excel(FILENAME)
+        df_signal = pd.read_excel(FILENAME)
     except FileNotFoundError:
-        print("❌ File tidak ditemukan.")
+        print("❌ File sinyal tidak ditemukan.")
         return
 
-    if df.empty:
-        print("📭 Tidak ada data untuk divalidasi.")
+    if df_signal.empty:
+        print("📭 Tidak ada data sinyal.")
         return
 
-    # Ambil 4 candle terakhir (3 validasi + 1 konfirmasi saat ini)
-    candles = fetch_data(limit=4)
-    if candles.empty or len(candles) < 4:
-        print("❌ Gagal ambil data candle.")
-        return
+    # Ambil candle terakhir (cukup 100 saja)
+    df_candles = fetch_data(limit=100)
+    df_candles = calculate_indicators(df_candles)
 
-    candles = konfirmasi_indikator(candles)
-    latest = candles.iloc[-1]
-    window = candles.iloc[-4:-1]  # 3 candle validasi TP/SL
+    updated_signals = []
 
-    messages = []
-    updated = 0
-    for idx, row in df.iterrows():
+    for idx, row in df_signal.iterrows():
         if row['status'] != 'HOLD':
             continue
 
+        # Cari candle saat sinyal muncul
         ts = pd.to_datetime(row['timestamp'])
-        if datetime.now() - ts > timedelta(minutes=45):
-            df.at[idx, 'status'] = 'NO-HIT'
-        else:
-            # Konfirmasi tambahan: volume spike & indikator
-            if latest['volume'] < window['volume'].mean() * 1.5:
-                continue  # Tidak validasi jika tidak ada spike
+        matching_idx = df_candles.index[df_candles['timestamp'] == ts]
 
-            rsi_valid = 45 < latest['rsi'] < 70 if row['signal'] == 'LONG' else 30 < latest['rsi'] < 55
-            macd_valid = latest['macd_hist'] > 0 if row['signal'] == 'LONG' else latest['macd_hist'] < 0
+        if matching_idx.empty:
+            continue  # candle tidak ditemukan
 
-            if not (rsi_valid and macd_valid):
-                continue  # Sinyal tidak valid jika tidak dikonfirmasi indikator
+        pos = matching_idx[0]
 
+        # Hanya validasi jika sudah lewat 3 candle
+        if pos + MAX_LOOKAHEAD >= len(df_candles):
+            continue  # belum cukup waktu
+
+        lookahead = df_candles.iloc[pos+1:pos+1+MAX_LOOKAHEAD]
+
+        hit_tp = False
+        hit_sl = False
+        konfirmasi = False
+
+        for _, candle in lookahead.iterrows():
+            # Konfirmasi indikator
             if row['signal'] == 'LONG':
-                if window['high'].max() >= row['tp_price']:
-                    df.at[idx, 'status'] = 'TP'
-                elif window['low'].min() <= row['sl_price']:
-                    df.at[idx, 'status'] = 'SL'
+                if (
+                    candle['ema_fast'] > candle['ema_slow']
+                    and candle['rsi'] > 50
+                    and candle['adx'] > 20
+                    and candle['vol_spike']
+                ):
+                    konfirmasi = True
+                    if candle['high'] >= row['tp_price']:
+                        hit_tp = True
+                        break
+                    elif candle['low'] <= row['sl_price']:
+                        hit_sl = True
+                        break
+
             elif row['signal'] == 'SHORT':
-                if window['low'].min() <= row['tp_price']:
-                    df.at[idx, 'status'] = 'TP'
-                elif window['high'].max() >= row['sl_price']:
-                    df.at[idx, 'status'] = 'SL'
+                if (
+                    candle['ema_fast'] < candle['ema_slow']
+                    and candle['rsi'] < 50
+                    and candle['adx'] > 20
+                    and candle['vol_spike']
+                ):
+                    konfirmasi = True
+                    if candle['low'] <= row['tp_price']:
+                        hit_tp = True
+                        break
+                    elif candle['high'] >= row['sl_price']:
+                        hit_sl = True
+                        break
 
-        if df.at[idx, 'status'] != 'HOLD':
-            updated += 1
-            pesan = (
-                f"📈 Validasi Sinyal"
-                f"🕒 Waktu       : {row['timestamp']}"
-                f"📌 Sinyal      : {row['signal']}"
-                f"🎯 Entry       : {row['current_price']:.2f}"
-                f"📈 TP Price    : {row['tp_price']:.2f}"
-                f"📉 SL Price    : {row['sl_price']:.2f}"
-                f"✅ Status      : {df.at[idx, 'status']}"
+        # Update status
+        if not konfirmasi:
+            status = 'NO-CONFIRM'
+        elif hit_tp:
+            status = 'TP'
+        elif hit_sl:
+            status = 'SL'
+        else:
+            status = 'NO-HIT'
+
+        df_signal.at[idx, 'status'] = status
+        updated_signals.append({
+            'timestamp': row['timestamp'],
+            'signal': row['signal'],
+            'price': row['current_price'],
+            'tp': row['tp_price'],
+            'sl': row['sl_price'],
+            'status': status
+        })
+
+    df_signal.to_excel(FILENAME, index=False)
+    print(f"✅ {len(updated_signals)} sinyal berhasil divalidasi.")
+
+    # Kirim semua update via Telegram
+    if updated_signals:
+        pesan = "📊 *Hasil Validasi Sinyal 15M:*\n"
+        for s in updated_signals:
+            pesan += (
+                f"🕒 {s['timestamp']}\n"
+                f"🔹 Sinyal: {s['signal']} | Harga: {s['price']:.2f}\n"
+                f"🎯 TP: {s['tp']:.2f} | SL: {s['sl']:.2f}\n"
+                f"📌 Status: *{s['status']}*\n\n"
             )
-            messages.append(pesan)
+        asyncio.run(kirim_pesan(pesan))
 
-    df.to_excel(FILENAME, index=False)
-    print(f"✅ Validasi selesai. {updated} sinyal diperbarui.")
-
-    for msg in messages:
-        asyncio.run(kirim_pesan(msg))
 
 if __name__ == "__main__":
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚦 Memulai validasi status dinamis...")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚦 Validasi sinyal dinamis mulai...")
     validate_signals()
