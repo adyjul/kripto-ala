@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 # Load .env
 load_dotenv()
 
-FILENAME = '/root/kripto-ala/validasi_scalping_15m_dinamis.xlsx'
+FILENAME = '/root/kripto-ala/validasi_scalping_15m.xlsx'
 
 # Telegram Bot setup
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -33,55 +33,69 @@ def validate_signals():
         print("📭 Tidak ada data untuk divalidasi.")
         return
 
-    candles = fetch_data(limit=3)
-    if candles.empty or len(candles) < 3:
+    candles = fetch_data(limit=5)  # Ambil 5 candle terbaru
+    if candles.empty or len(candles) < 4:
         print("❌ Gagal ambil data candle.")
         return
 
-    high = candles['high'].max()
-    low = candles['low'].min()
+    result_messages = []
+    updated = 0
 
-    updated_rows = []
-    pesan_list = []
-
+    # Ambil 3 candle setelah sinyal
     for idx, row in df.iterrows():
         if row['status'] != 'HOLD':
             continue
 
-        waktu_sinyal = pd.to_datetime(row['timestamp'])
-        if (datetime.now() - waktu_sinyal).total_seconds() > 2700:
-            continue  # Lewat 45 menit
+        entry_time = pd.to_datetime(row['timestamp'])
+        valid_candles = candles[candles['timestamp'] > entry_time].head(3)
 
-        status = 'NO-HIT'
-        if row['signal'] == 'LONG':
-            if high >= row['tp_price']:
-                status = 'TP'
-            elif low <= row['sl_price']:
-                status = 'SL'
-        elif row['signal'] == 'SHORT':
-            if low <= row['tp_price']:
-                status = 'TP'
-            elif high >= row['sl_price']:
-                status = 'SL'
+        for _, candle in valid_candles.iterrows():
+            high = candle['high']
+            low = candle['low']
+            status = None
 
-        df.at[idx, 'status'] = status
-        updated_rows.append(idx)
+            if row['signal'] == 'LONG':
+                if high >= row['tp_price']:
+                    status = 'TP'
+                elif low <= row['sl_price']:
+                    status = 'SL'
+            elif row['signal'] == 'SHORT':
+                if low <= row['tp_price']:
+                    status = 'TP'
+                elif high >= row['sl_price']:
+                    status = 'SL'
 
-        pesan_list.append(
-            f"📈 Sinyal {row['signal']} ({status})\n"
-            f"🕒 {row['timestamp']}\n"
-            f"🎯 Entry: {row['current_price']:.2f}\n"
-            f"🎯 TP: {row['tp_price']:.2f} | SL: {row['sl_price']:.2f}"
-        )
+            if status:
+                df.at[idx, 'status'] = status
+                updated += 1
+                result_messages.append(
+                    f"📈 Sinyal ({row['signal']})\n"
+                    f"🕒 Waktu: {row['timestamp']}\n"
+                    f"💰 Entry: {row['current_price']:.2f}\n"
+                    f"🎯 TP: {row['tp_price']:.2f}\n"
+                    f"🛡️ SL: {row['sl_price']:.2f}\n"
+                    f"📌 Status: {status}"
+                )
+                break
+        else:
+            # Jika tidak TP atau SL setelah 3 candle
+            df.at[idx, 'status'] = 'NO-HIT'
+            updated += 1
+            result_messages.append(
+                f"📈 Sinyal ({row['signal']})\n"
+                f"🕒 Waktu: {row['timestamp']}\n"
+                f"💰 Entry: {row['current_price']:.2f}\n"
+                f"🎯 TP: {row['tp_price']:.2f}\n"
+                f"🛡️ SL: {row['sl_price']:.2f}\n"
+                f"📌 Status: NO-HIT"
+            )
 
-    if updated_rows:
-        df.to_excel(FILENAME, index=False)
-        print(f"✅ Validasi selesai. {len(updated_rows)} sinyal diperbarui.")
+    df.to_excel(FILENAME, index=False)
+    print(f"✅ Validasi selesai. {updated} sinyal diperbarui.")
 
-    # Kirim semua pesan (maks 10 per batch biar tidak spam telegram)
-    for i in range(0, len(pesan_list), 10):
-        batch = pesan_list[i:i+10]
-        asyncio.run(kirim_pesan("\n\n".join(batch)))
+    for msg in result_messages:
+        asyncio.run(kirim_pesan(msg))
+
 
 if __name__ == "__main__":
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚦 Memulai validasi status sinyal...")

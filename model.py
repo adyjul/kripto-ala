@@ -41,6 +41,9 @@ def load_data():
     return df
 
 def calculate_features(df):
+    from ta.momentum import RSIIndicator
+    from ta.trend import MACD, EMAIndicator, ADXIndicator
+    from ta.volatility import AverageTrueRange
     df = df.copy()
     df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
     macd = MACD(close=df['close'])
@@ -51,12 +54,9 @@ def calculate_features(df):
     df['ema_slow'] = EMAIndicator(close=df['close'], window=26).ema_indicator()
     df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close']).adx()
     df['atr'] = AverageTrueRange(high=df['high'], low=df['low'], close=df['close']).average_true_range()
-    
-    # Tambahan fitur scalping
     df['body'] = abs(df['close'] - df['open'])
     df['range'] = df['high'] - df['low']
     df['volatility_ratio'] = df['range'] / df['close']
-    
     df.dropna(inplace=True)
     return df
 
